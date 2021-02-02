@@ -1,0 +1,306 @@
+$hashfileExts =  @{aura= "cmp,cmp-meta.xml,css,js,cmp,evt,evt-meta.xml";documents= "jpeg,png"} 
+function funcObjectFolderFile([string] $object_folder_file ,[string] $argdefaultext,[string] $argelement,[string] $argfileext,[boolean] $argMultipleSplitPath, [string] $file_to_deploy_type , [boolean] $allmembers){
+	Set-Location $src 
+	if($argMultipleSplitPath)
+		{ 
+			Split-Path -Path "$object_folder_file\*."$argdefaultext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
+			Split-Path -Path "$object_folder_file\*."$argdefaultext"-meta.xml" -Leaf -Resolve >> $src\$object_folder_file\file_to_deploy.log
+			Split-Path -Path "$object_folder_file\*."$argdefaultext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy_pkg.log
+		}
+	else {
+			Split-Path -Path "$object_folder_file\*."$argdefaultext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
+		}
+	$xmlWriter.WriteStartElement('types')
+
+	if($argelement -eq "SharingCriteriaRule" -or $argelement -eq "SharingOwnerRule" )
+	{
+		$xmlWriter.WriteElementString('members', "*")
+		$xmlWriter.WriteElementString('name', "$argelement")
+		$xmlWriter.WriteEndElement()
+	}
+	else {
+	foreach ($filename in get-content $src\$object_folder_file\$file_to_deploy_type) {
+		if($argdefaultext -eq "quickAction" -or $argdefaultext -eq "duplicateRules"){
+			if ($filename.split('.')[1] -ne 'quickAction') {
+				$file_name = $filename.split('.')[0]
+				$file_name2 = $filename.split('.')[1]							
+				write-host "$file_name.$file_name2"
+				$xmlWriter.WriteElementString('members', "$file_name" + "." + "$file_name2")
+			}
+			elseif ($filename.split('.')[1] -ne 'duplicateRules') {
+				$file_name = $filename.split('.')[0]
+				$file_name2 = $filename.split('.')[1]							
+				write-host "$file_name.$file_name2"
+				$xmlWriter.WriteElementString('members', "$file_name" + "." + "$file_name2")
+			}
+			else {
+				$file_name = $filename.split('.')[0]
+				write-host "$file_name"
+				$xmlWriter.WriteElementString('members', "$file_name")
+			}
+		}
+		else {
+				if($argdefaultext -eq "md"){
+					$file_name_old2 = $filename.split('.')[1]
+					$file_name_old1 = $filename.split('.')[0]
+					$file_name = "$file_name_old1.$file_name_old2"
+				}
+				else { 
+					$file_name = $filename.split('.')[0]
+				}
+			write-host "$file_name"
+			if(!$argfileext -eq "")
+			{
+				$xmlWriter.WriteElementString('members', "$file_name.$argfileext")				
+			}		
+			else 
+			{
+				if($allmembers){
+					$xmlWriter.WriteElementString('members', "*")
+				}
+				else{
+					$xmlWriter.WriteElementString('members', "$file_name")
+				}
+			}
+		} 
+	}
+}
+   	$xmlWriter.WriteElementString('name', "$argelement") 
+	$xmlWriter.WriteEndElement()
+}
+
+function funcObjectFolderInside([string] $object_folder_file ,[string] $argdefaultext,[string] $argelement,[boolean] $argMultipleSplitPath,[boolean] $argUnifiedpublic){
+	Set-Location $src 
+	$xmlWriter.WriteStartElement("types")
+		$object_folder_inside = Get-ChildItem  $src\$object_folder_file  -Name -attributes D -Recurse > $src\$object_folder_file\folder_to_deploy.log
+		foreach ($foldername in get-content $src\$object_folder_file\folder_to_deploy.log) {
+			Set-Location $src
+			if($argMultipleSplitPath)
+			{  
+					$st = $hashfileExts["$object_folder_file"]
+					$Array =$st.Split(",")
+					foreach ($ext in $Array) {
+						Split-Path -Path "$object_folder_file\$foldername\*."$ext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
+					}
+  			}
+			else {
+				Split-Path -Path "$object_folder_file\*."$argdefaultext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
+			}
+			if($argUnifiedpublic)
+			{
+				if ($foldername -ne 'unfiled$public') {
+					$xmlWriter.WriteElementString('members', "$foldername")
+				}
+				foreach ($filename in get-content $src\$object_folder_file\file_to_deploy.log) {
+					$file_name = $filename.split('.')[0]
+					write-host "$file_name"
+					$xmlWriter.WriteElementString('members', "$foldername/$file_name")
+
+				}
+			}
+			else {
+				$xmlWriter.WriteElementString('members', "$foldername")
+						foreach ($filename in get-content $src\$object_folder_file\file_to_deploy.log) {
+							$file_name = $filename.split('.')[0]
+							write-host "$file_name"
+							if ($foldername -ne $file_name) {
+								$xmlWriter.WriteElementString('members', "$foldername/$file_name")
+							}						
+						}	
+			}
+			if ($object_folder_file -eq "reports" )
+			{
+				if ((Test-Path -Path "$src\$object_folder_file\folder_to_deploy.log") -and (Test-Path -Path "$src\$object_folder_file\file_to_deploy.log")) {
+					echo "Deleting file_to_deploy and folder_to_deploy"		
+					Remove-Item -path $src\$object_folder_file\folder_to_deploy.log
+					Remove-Item -path $src\$object_folder_file\file_to_deploy.log
+				}
+			}			
+		}			
+
+		$xmlWriter.WriteElementString('name', "$argelement")
+		$xmlWriter.WriteEndElement()
+ 
+}
+
+#$hash = @{ "app" = "CustomApplication"; Shape = "Square"; Color = "Blue"}
+function PackageCreation {
+	try {
+
+		$scriptPath = "${ENV:System_DefaultWorkingDirectory}\Core\Scripts"
+		$src = "${scriptPath}\..\..\artifact\Core\src"
+		$package_location = "${scriptPath}\..\..\artifact"
+		if ( test-path  $src) {
+
+			#Getting all Folders name. 
+			$object_folder = Get-ChildItem  $src  -Name -attributes D -Recurse 
+			$object_folder > $src\List.txt
+			$xmlWriter = New-Object System.XMl.XmlTextWriter("$src\package.xml", $Null)
+			$xmlWriter.Formatting = 'Indented'
+			$xmlWriter.Indentation = 1
+			$XmlWriter.IndentChar = "`t"
+			$xmlWriter.WriteStartDocument()
+			$xmlWriter.WriteStartElement('Package')
+			foreach ($object_folder_file in get-content $src\List.txt) {
+				######### Elements are Called by Switch Case########################################
+				switch ($object_folder_file) {
+					"applications"
+						{funcObjectFolderFile("applications","app", "CustomApplication","",0,"file_to_deploy.log",0)}
+					"assignmentRules" 
+						{funcObjectFolderFile("assignmentRules","assignmentRules","AssignmentRules","",0,"file_to_deploy.log",0)}
+					"appMenus" 
+						{funcObjectFolderFile("appMenus","appMenu","AppMenu","",0,"file_to_deploy.log",0)}
+					"autoResponseRules" 
+						{funcObjectFolderFile("autoResponseRules","autoResponseRules","AutoResponseRule","New Customer Application Response",0,"file_to_deploy.log",0)}
+					"datacategorygroups"
+						{funcObjectFolderFile("datacategorygroups","datacategorygroup","DataCategoryGroup","New Customer Application Response",0,"file_to_deploy.log",0)}
+					"flows" 
+						{funcObjectFolderFile("flows","flow","Flow","",0,"file_to_deploy.log",0)}
+					"homePageComponents" 
+						{funcObjectFolderFile("homePageComponents","homePageComponent","HomePageComponent","",0,"file_to_deploy.log",0)}
+					"globalValueSets" 
+						{funcObjectFolderFile("globalValueSets","globalValueSet","GlobalValueSet","",0,"file_to_deploy.log",0)}
+					"homePageLayouts" 
+						{funcObjectFolderFile("homePageLayouts","homePageLayout","HomePageLayout","",0,"file_to_deploy.log",0)}
+					"letterhead" 
+						{funcObjectFolderFile("letterhead","letter","Letterhead","",0,"file_to_deploy.log",0)}
+					"objectTranslations" 
+						{funcObjectFolderFile("objectTranslations","objectTranslation","CustomObjectTranslation","",0,"file_to_deploy.log",0)}
+					"permissionsets" 
+						{funcObjectFolderFile("permissionsets","permissionset","PermissionSet","",0,"file_to_deploy.log",0)}
+					"quickActions" 
+						{funcObjectFolderFile("quickActions","quickAction","QuickAction","",0,"file_to_deploy.log",0)}
+					"remoteSiteSettings" 
+						{funcObjectFolderFile("remoteSiteSettings","remoteSite","RemoteSiteSetting","",0,"file_to_deploy.log",0)}
+					"roles" 
+						{funcObjectFolderFile("roles","role","Role","",0,"file_to_deploy.log",0)}
+					"weblinks" 
+						{funcObjectFolderFile("weblinks","weblink","CustomPageWebLink","",0,"file_to_deploy.log",0)}
+					"workflows" 
+						{funcObjectFolderFile("workflows","workflow","Workflow","",0,"file_to_deploy.log",0)}
+					"customMetadata" 
+						{funcObjectFolderFile("customMetadata","md","CustomMetadata","",0,"file_to_deploy.log",0)}
+					"classes" 
+						{funcObjectFolderFile("classes","cls","ApexClass","",1,"file_to_deploy_pkg.log",0)}
+					"certs" 
+						{funcObjectFolderFile("certs","crt","Certificate","",1,"file_to_deploy_pkg.log",0)}
+					"contentassets" 
+						{funcObjectFolderFile("contentassets","asset","ContentAsset","",1,"file_to_deploy_pkg.log",0)}
+					"entitlementProcesses" 
+						{funcObjectFolderFile("entitlementProcesses","entitlementProcess","EntitlementProcess","",0,"file_to_deploy.log",1)}
+					"milestoneTypes" 
+						{funcObjectFolderFile("milestoneTypes","milestoneType","MilestoneType","",0,"file_to_deploy.log",1)}
+					"components" 
+						{funcObjectFolderFile("components","component","ApexComponent","",1,"file_to_deploy_pkg.log",0)}
+					"tabs" 
+						{funcObjectFolderFile("tabs","tab","CustomTab","",0,"file_to_deploy.log",0)}
+					"triggers" 
+						{funcObjectFolderFile("triggers","trigger","ApexTrigger","",1,"file_to_deploy_pkg.log",0)}
+					"reportTypes" 
+						{funcObjectFolderFile("reportTypes","reportType","ReportType","",0,"file_to_deploy.log",0)}
+					"objects" 
+						{funcObjectFolderFile("objects","object","CustomObject","",0,"file_to_deploy.log",0)}
+					"profiles" 
+						{funcObjectFolderFile("profiles","profile","Profile","",0,"file_to_deploy.log",0)}
+					"layouts" 
+						{funcObjectFolderFile("layouts","layout","Layout","",0,"file_to_deploy.log",0)}
+						## Added SharingRules
+					"sharingRules" 
+						{funcObjectFolderFile("sharingRules","sharingRules","SharingCriteriaRule","",0,"file_to_deploy.log",0)}
+					"sharingRules" 
+						{funcObjectFolderFile("sharingRules","sharingRules","SharingOwnerRule","",0,"file_to_deploy.log",0)}
+					"staticresources" 
+						{funcObjectFolderFile("staticresources","resource","StaticResource","",1,"file_to_deploy_pkg.log",0)}
+					"pages" 
+						{funcObjectFolderFile("pages","page","ApexPage","",1,"file_to_deploy_pkg.log",0)}
+					"labels" 
+						{funcObjectFolderFile("labels","labels","CustomLabels","",0,"file_to_deploy.log",0)}
+					"ListView" 
+						{funcObjectFolderFile("ListView","objects","ListView","",0,"file_to_deploy.log",0)}
+					"groups" 
+						{funcObjectFolderFile("groups","group","Group","",0,"file_to_deploy.log",0)}
+					"Queues" 
+						{funcObjectFolderFile("Queues","Queue","Queue","",0,"file_to_deploy.log",0)}
+					"ApprovalProcesses" 
+						{funcObjectFolderFile("ApprovalProcesses","approvalProcess","ApprovalProcess","approval_process_for_business_approval",0,"file_to_deploy.log",0)}
+						##Folder Inside Folder
+	#funcObjectFolderInside([string] $object_folder_file ,[string] $argdefaultext,[string] $argelement,[boolean] $argMultipleSplitPath,[boolean] $argUnifiedpublic)
+					"email" 
+						{funcObjectFolderInside("email","email","EmailTemplate",0,1)}
+					"documents" 
+						{funcObjectFolderInside("documents","documents","Document",1,0)}
+					"dashboards" 
+						{funcObjectFolderInside("dashboards","dashboard","Dashboard",0,0)}
+					"reports" 
+						{funcObjectFolderInside("reports","report","Report","",0,1)}
+					"aura" 
+						{funcObjectFolderInside("aura","aura","AuraDefinitionBundle","",0,1)}
+						###############
+					"standardValueSets" 
+						{funcObjectFolderFile("standardValueSets","standardValueSet","StandardValueSet","",0,"file_to_deploy.log",0)}
+					"flexipages" 
+						{funcObjectFolderFile("flexipages","flexipage","FlexiPage","",0,"file_to_deploy.log",0)}					
+					"cleanDataServices" 
+						{funcObjectFolderFile("cleanDataServices","cleanDataService","CleanDataService","",0,"file_to_deploy.log",0)}
+					"communities" 
+						{funcObjectFolderFile("communities","community","Community","",0,"file_to_deploy.log",0)}
+					"delegateGroups" 
+						{funcObjectFolderFile("delegateGroups","delegateGroup","DelegateGroup","",0,"file_to_deploy.log",0)}
+					"duplicateRules" 
+						{funcObjectFolderFile("duplicateRules","duplicateRule","DuplicateRule","",0,"file_to_deploy.log",0)}
+					"emailservices" 
+						{funcObjectFolderFile("emailservices","xml","EmailServicesFunction","",0,"file_to_deploy.log",0)}
+						## Added escalationRules
+					"escalationRules" 
+						{funcObjectFolderFile("escalationRules","escalationRules","EscalationRules","",0,"file_to_deploy.log",0)}
+					"escalationRules" 
+						{funcObjectFolderFile("escalationRules","escalationRules","EscalationRule","SLA",0,"file_to_deploy.log",0)}
+					"installedPackages" 
+						{funcObjectFolderFile("installedPackages","installedPackage","InstalledPackage","",0,"file_to_deploy.log",0)}
+					"matchingRules" 
+						{funcObjectFolderFile("matchingRules","matchingRule","MatchingRules","",0,"file_to_deploy.log",0)}
+					"portals" 
+						{funcObjectFolderFile("portals","portal","Portal","",0,"file_to_deploy.log",0)}
+					"profilePasswordPolicies" 
+						{funcObjectFolderFile("profilePasswordPolicies","profilePasswordPolicy","ProfilePasswordPolicy","",0,"file_to_deploy.log",0)}
+					"profileSessionSettings" 
+						{funcObjectFolderFile("profileSessionSettings","profileSessionSetting","ProfileSessionSetting","",0,"file_to_deploy.log",0)}
+					"samlssoconfigs" 
+						{funcObjectFolderFile("samlssoconfigs","samlssoconfig","SamlSsoConfig","",0,"file_to_deploy.log",0)}
+					"settings" 
+						{funcObjectFolderFile("settings","settings","Settings","",0,"file_to_deploy.log",0)}
+					"testSuites" 
+						{funcObjectFolderFile("testSuites","testSuite","ApexTestSuite","",0,"file_to_deploy.log",0)}
+					"topicsForObjects" 
+						{funcObjectFolderFile("topicsForObjects","topicsForObject","TopicsForObjects","",0,"file_to_deploy.log",0)}
+					"translations" 
+						{funcObjectFolderFile("translations","translation","Translations","",0,"file_to_deploy.log",0)}
+					"AnimationRules" 
+						{funcObjectFolderFile("AnimationRules","animationRule","AnimationRule","",0,"file_to_deploy.log",0)}
+					"pathAssistants" 
+						{funcObjectFolderFile("pathAssistants","pathAssistant","pathAssistant","",0,"file_to_deploy.log",0)}
+					default
+						{"No Match Found"}
+					}
+				##################################################		
+			}
+			$xmlWriter.WriteElementString('version', 49.0)
+			$xmlWriter.WriteEndElement()
+			$xmlWriter.WriteEndDocument()
+			$xmlWriter.Flush()
+			$xmlWriter.Close()
+			Copy-Item "$scriptPath\build.xml" "$scriptPath\..\..\artifact" -force ;
+			Copy-Item "$scriptPath\build.properties" "$scriptPath\..\..\artifact" -force ;
+			Copy-Item "$scriptPath\ant-salesforce.jar" "$scriptPath\..\..\artifact" -force
+		}
+		else {
+			write-host "Nothing to Create for package.xml"
+			exit 0
+		}
+	}
+	catch {
+		Write-Host "An error occurred:" -BackgroundColor "Red" -ForegroundColor "Black"
+		Write-Host $_
+		return 0
+	}
+}
