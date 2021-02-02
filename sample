@@ -3,16 +3,16 @@ function funcObjectFolderFile([string] $object_folder_file ,[string] $argdefault
 	Set-Location $src 
 	if($argMultipleSplitPath)
 		{ 
-			Split-Path -Path "$object_folder_file\*."$argdefaultext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
+			Split-Path -Path "$object_folder_file\*.$argdefaultext" -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
 			Split-Path -Path "$object_folder_file\*."$argdefaultext"-meta.xml" -Leaf -Resolve >> $src\$object_folder_file\file_to_deploy.log
-			Split-Path -Path "$object_folder_file\*."$argdefaultext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy_pkg.log
+			Split-Path -Path "$object_folder_file\*.$argdefaultext" -Leaf -Resolve > $src\$object_folder_file\file_to_deploy_pkg.log
 		}
 	else {
-			Split-Path -Path "$object_folder_file\*."$argdefaultext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
+			Split-Path -Path "$object_folder_file\*.$argdefaultext" -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
 		}
 	$xmlWriter.WriteStartElement('types')
 
-	if($argelement -eq "SharingCriteriaRule" -or $argelement -eq "SharingOwnerRule" )
+	if($argelement -eq "SharingCriteriaRule" -or "$argelement" -eq "SharingOwnerRule" )
 	{
 		$xmlWriter.WriteElementString('members', "*")
 		$xmlWriter.WriteElementString('name', "$argelement")
@@ -20,7 +20,7 @@ function funcObjectFolderFile([string] $object_folder_file ,[string] $argdefault
 	}
 	else {
 	foreach ($filename in get-content $src\$object_folder_file\$file_to_deploy_type) {
-		if($argdefaultext -eq "quickAction" -or $argdefaultext -eq "duplicateRules"){
+		if($argdefaultext -eq "quickAction" -or "$argdefaultext" -eq "duplicateRules"){
 			if ($filename.split('.')[1] -ne 'quickAction') {
 				$file_name = $filename.split('.')[0]
 				$file_name2 = $filename.split('.')[1]							
@@ -49,9 +49,9 @@ function funcObjectFolderFile([string] $object_folder_file ,[string] $argdefault
 					$file_name = $filename.split('.')[0]
 				}
 			write-host "$file_name"
-			if(!$argfileext -eq "")
+			if(!"$argfileext" -eq "")
 			{
-				$xmlWriter.WriteElementString('members', "$file_name.$argfileext")				
+				$xmlWriter.WriteElementString('members', "$file_name"."$argfileext")				
 			}		
 			else 
 			{
@@ -80,11 +80,11 @@ function funcObjectFolderInside([string] $object_folder_file ,[string] $argdefau
 					$st = $hashfileExts["$object_folder_file"]
 					$Array =$st.Split(",")
 					foreach ($ext in $Array) {
-						Split-Path -Path "$object_folder_file\$foldername\*."$ext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
+						Split-Path -Path "$object_folder_file\$foldername\*.$ext" -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
 					}
   			}
 			else {
-				Split-Path -Path "$object_folder_file\*."$argdefaultext -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
+				Split-Path -Path "$object_folder_file\*.$argdefaultext" -Leaf -Resolve > $src\$object_folder_file\file_to_deploy.log
 			}
 			if($argUnifiedpublic)
 			{
